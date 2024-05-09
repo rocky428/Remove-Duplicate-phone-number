@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Remove Duplicate Rows from Excel</title>
+</head>
+<body>
+<h2>Remove Duplicate Rows from Excel</h2>
+<input type="file" id="excelFileInput" accept=".xlsx">
+<button onclick="removeDuplicates()">Remove Duplicates</button>
+<table id="dataTable" border="1">
+<!-- Table will be populated dynamically -->
+</table>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+<script>
+function removeDuplicates() {
+    const fileInput = document.getElementById('excelFileInput');
+    const file = fileInput.files[0];
+
+    if (!file) {
+        alert('Please select a file.');
+        return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = function (e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+
+        const sheetName = workbook.SheetNames[0]; // Assuming first sheet
+        const sheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+        const filteredRows = rows.filter(row => {
+            const key = row[0]; // Assuming first column is the key
+            return key && /^\d{10}$/.test(key.toString()); // Filter rows with exactly 10 digits in the first column
+        });
+
+        const countMap = new Map();
+
+        // Count occurrences of values in the first column
+        for (const row of filteredRows) {
+            const key = row[0]; // Assuming first column is the key
+            countMap.set(key, (countMap.get(key) || 0) + 1);
+        }
+
+        const uniqueRows = [];
+        const seen = new Set();
+
+        // Iterate through filtered rows, removing duplicates based on first column
+        for (const row of filteredRows) {
+            const key = row[0]; // Assuming first column is the key
+            if (!seen.has(key)) {
+                uniqueRows.push([...row, countMap.get(key) || 0]); // Add count as new column
+                seen.add(key);
+            }
+        }
+
+        // Convert the unique rows back to Excel format
+        const newSheet = XLSX.utils.aoa_to_sheet(uniqueRows);
+
+        // Convert the sheet back to a workbook
+        const newWorkbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(newWorkbook, newSheet, sheetName);
+
+        // Save the workbook to a file and provide a download link
+        const wbout = XLSX.write(newWorkbook, { type: 'array', bookType: 'xlsx' });
+        const blob = new Blob([wbout], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'cleaned_file.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function() {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 0);
+    };
+
+    reader.readAsArrayBuffer(file);
+}
+</script>
+</body>
+</html>
